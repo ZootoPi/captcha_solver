@@ -10,12 +10,6 @@ class AlexNet(nn.Module):
         self.num_classes = num_classes
         self.num_digits = num_digits
 
-        self.transforms = nn.Sequential(
-            transforms.Resize(256),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225]),
-        )
         self.features = nn.Sequential(
             nn.Conv2d(3, 32, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
@@ -29,15 +23,14 @@ class AlexNet(nn.Module):
         )
 
         self.classifier = nn.Sequential(
-            nn.Linear(46656, 1024),
+            nn.Linear(9856, 1024),
             nn.ReLU(inplace=True),
             nn.Linear(1024, num_classes * num_digits),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.transforms(x)
         x = self.features(x)
         x = torch.flatten(x, 1)
         x = self.classifier(x)
-        x = torch.reshape(x, (self.num_digits, self.num_classes))
+        x = torch.reshape(x, (x.shape[0], self.num_classes, self.num_digits))
         return x

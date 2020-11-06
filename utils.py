@@ -2,6 +2,7 @@ import os
 import json
 import numpy as np
 from PIL import Image
+from torch.utils.data import Dataset, DataLoader
 
 
 def load_data(data_dir, flatten=False):
@@ -61,7 +62,7 @@ def _read_label(filename, label_choices, **extra_meta):
     return data
 
 
-class DataSet(object):
+class DataSet(Dataset):
     """Provide `next_batch` method, which returns the next `batch_size` examples from this data set."""
 
     def __init__(self, images, labels):
@@ -112,21 +113,14 @@ class DataSet(object):
         self._index_in_epoch += batch_size
         return self._images[start:self._index_in_epoch], self._labels[start:self._index_in_epoch]
 
+    def __getitem__(self, idx):
+        d = self.df.iloc[idx.item()]
+        image = Image.open(self.img_dir/d.image).convert("RGB")
+        label = torch.tensor(d[1:].tolist(), dtype=torch.float32)
 
-def display_debug_info(meta, train_data, test_data):
-    print('%s Meta Info %s' % ('=' * 10, '=' * 10))
-    for k, v in meta.items():
-        print('%s: %s' % (k, v))
-    print('=' * 30)
+        if self.transforms is not None:
+        image = self.transforms(image)
+        return image, label
 
-    print('train images: %s, labels: %s' %
-          (train_data.images.shape, train_data.labels.shape))
-
-    print('test images: %s, labels: %s' %
-          (test_data.images.shape, test_data.labels.shape))
-
-
-if __name__ == '__main__':
-    import sys
-    ret1 = load_data(data_dir=sys.argv[1])
-    display_debug_info(*ret1)
+    def __len__(self):
+        return len(self.df)

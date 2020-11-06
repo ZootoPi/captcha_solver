@@ -34,7 +34,11 @@ def _gen_captcha(img_dir, num_per_image, n, width, height, choices):
     for _ in range(n):
         for i in itertools.permutations(choices, num_per_image):
             captcha = ''.join(i)
-            fn = os.path.join(img_dir, '%s_%s.png' % (captcha, uuid.uuid4()))
+            if not os.path.exists(os.path.join(img_dir, captcha)):
+                os.makedirs(os.path.join(img_dir, captcha))
+
+            fn = os.path.join(img_dir, captcha,  '%s_%s.png' %
+                              (captcha, uuid.uuid4()))
             image.write(captcha, fn)
 
 
@@ -66,6 +70,8 @@ def gen_dataset():
 
     _gen_captcha(build_file_path('train'), num_per_image,
                  n_epoch, width, height, choices=choices)
+    _gen_captcha(build_file_path('val'), num_per_image, max(
+        1, int(n_epoch * test_ratio)), width, height, choices=choices)
     _gen_captcha(build_file_path('test'), num_per_image, max(
         1, int(n_epoch * test_ratio)), width, height, choices=choices)
 
@@ -80,7 +86,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '-n',
-        default=5,
+        default=6,
         type=int,
         help='epoch number of character permutations.')
 
