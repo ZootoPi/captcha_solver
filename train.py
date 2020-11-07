@@ -10,12 +10,11 @@ import torch.optim as optim
 import torch.nn as nn
 
 from model import AlexNet
+from utils import load_data
 
 
 data_dir = "images/char-4-epoch-6"
 batch_size = 16
-
-model = AlexNet()
 
 
 def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
@@ -43,7 +42,6 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
             # Iterate over data.
             for inputs, labels in dataloaders[phase]:
                 inputs = inputs.to(device)
-                print(labels.data)
                 labels = labels.to(device)
 
                 # zero the parameter gradients
@@ -69,7 +67,7 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
 
             epoch_loss = running_loss / len(dataloaders[phase].dataset)
             epoch_acc = running_corrects.double(
-            ) / len(dataloaders[phase].dataset)
+            ) / len(dataloaders[phase].dataset) / 4
 
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(
                 phase, epoch_loss, epoch_acc))
@@ -101,13 +99,16 @@ im_transforms = transforms.Compose([
                          std=[0.229, 0.224, 0.225])
 ])
 
-# Create training and validation datasets
-image_datasets = {x: datasets.ImageFolder(os.path.join(
-    data_dir, x), im_transforms) for x in ['train', 'val']}
+
+meta, image_datasets = load_data(
+    data_dir, transforms=im_transforms)
+
+model = AlexNet()
+
 
 # Create training and validation dataloaders
 dataloaders_dict = {x: torch.utils.data.DataLoader(
-    image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=4) for x in ['train', 'val']}
+    image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=4) for x in ['train', 'val', 'test']}
 
 # Detect if we have a GPU available
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -121,14 +122,9 @@ model = model.to(device)
 #  that we have just initialized, i.e. the parameters with requires_grad
 #  is True.
 params_to_update = model.parameters()
-print("Params to learn:")
-
-for name, param in model.named_parameters():
-    if param.requires_grad == True:
-        print("\t", name)
 
 # Observe that all parameters are being optimized
 optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
 criterion = nn.CrossEntropyLoss()
 
-train_model(model, dataloaders_dict, criterion, optimizer_ft, 10)
+train_model(model, dataloaders_dict, criterion, optimizer_ft, 30)

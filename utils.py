@@ -3,124 +3,75 @@ import json
 import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
+import torch
 
 
-def load_data(data_dir, flatten=False):
+def load_data(data_dir, flatten=False, transforms=None):
     train_dir = os.path.join(data_dir, 'train')
+    val_dir = os.path.join(data_dir, 'val')
     test_dir = os.path.join(data_dir, 'test')
 
     meta_info = os.path.join(data_dir, 'meta.json')
     with open(meta_info, 'r') as f:
         meta = json.load(f)
 
-    train_images, train_labels = _read_images_and_labels(
-        train_dir, flatten=flatten, **meta)
-    test_images, test_labels = _read_images_and_labels(
-        test_dir, flatten=flatten, **meta)
-
     return (
         meta,
-        DataSet(train_images, train_labels),
-        DataSet(test_images, test_labels),
+        {
+            'train': CaptchaDataset(train_dir, transforms, **meta),
+            'val': CaptchaDataset(val_dir, transforms, **meta),
+            'test': CaptchaDataset(test_dir, transforms, **meta)
+        }
     )
 
 
-def _read_images_and_labels(dir_name, flatten, ext='.png', **meta):
-    images = []
-    labels = []
-    for fn in os.listdir(dir_name):
-        if fn.endswith(ext):
-            fd = os.path.join(dir_name, fn)
-            images.append(_read_image(fd, flatten=flatten, **meta))
-            labels.append(_read_label(fd, **meta))
-    return np.array(images), np.array(labels)
-
-
-def _read_image(filename, flatten, width, height, **extra_meta):
-    im = Image.open(filename).convert('L').resize(
-        (width, height), Image.ANTIALIAS)
-
-    data = np.asarray(im)
-    if flatten:
-        return data.reshape(width * height)
-
-    return data
-
-
-def _read_label(filename, label_choices, **extra_meta):
-    basename = os.path.basename(filename)
-    labels = basename.split('_')[0]
-
-    data = []
-
-    for c in labels:
-        idx = label_choices.index(c)
-        tmp = [0] * len(label_choices)
-        tmp[idx] = 1
-        data.extend(tmp)
-
-    return data
-
-
-class DataSet(Dataset):
+class CaptchaDataset(Dataset):
     """Provide `next_batch` method, which returns the next `batch_size` examples from this data set."""
 
-    def __init__(self, images, labels):
-        assert images.shape[0] == labels.shape[0], (
-            'images.shape: %s labels.shape: %s' % (images.shape, labels.shape))
-        self._num_examples = images.shape[0]
+    def __init__(self, dir, transforms, **meta):
+        self.meta = meta
+        self.data = self._scan_images(dir, **meta)
+        self.transforms = transforms
 
-        self._images = images
-        self._labels = labels
+    def _read_image(self, filename, width, height, **extra_meta):
+        im = Image.open(filename).resize(
+            (width, height), Image.ANTIALIAS)
 
-        self._epochs_completed = 0
-        self._index_in_epoch = 0
+        return im
 
-    @property
-    def images(self):
-        return self._images
+    def _read_label(self, filename, label_choices, **extra_meta):
+        basename = os.path.basename(filename)
+        labels = basename.split('_')[0]
 
-    @property
-    def labels(self):
-        return self._labels
+        data = []
 
-    @property
-    def num_examples(self):
-        return self._num_examples
+        for c in labels:
+            idx = label_choices.index(c)
+            data.append(idx)
 
-    @property
-    def epochs_completed(self):
-        return self._epochs_completed
+        return data
 
-    def next_batch(self, batch_size):
-
-        assert batch_size <= self._num_examples
-
-        if self._index_in_epoch + batch_size > self._num_examples:
-            # Finished epoch
-            self._epochs_completed += 1
-            self._index_in_epoch = 0
-
-        if self._index_in_epoch == 0:
-            # Shuffle the data
-            perm = np.arange(self._num_examples)
-            np.random.shuffle(perm)
-            self._images = self._images[perm]
-            self._labels = self._labels[perm]
-
-        # read next batch
-        start = self._index_in_epoch
-        self._index_in_epoch += batch_size
-        return self._images[start:self._index_in_epoch], self._labels[start:self._index_in_epoch]
+    def _scan_images(self, dir, flatten=False, ext='.png', **meta):
+        data = []
+        for fn in os.listdir(dir):
+            if fn.endswith(ext):
+                tmp = {}
+                fd = os.path.join(dir, fn)
+                tmp['image'] = fd
+                tmp['labels'] = self._read_label(fd, **meta)
+                data.append(tmp)
+        return data
 
     def __getitem__(self, idx):
-        d = self.df.iloc[idx.item()]
-        image = Image.open(self.img_dir/d.image).convert("RGB")
-        label = torch.tensor(d[1:].tolist(), dtype=torch.float32)
+        d = self.data[idx]
+        image = self._read_image(d['image'], **self.meta)
+
+        label = torch.tensor(d['labels'], dtype=torch.long)
 
         if self.transforms is not None:
-        image = self.transforms(image)
+            image = self.transforms(image)
         return image, label
 
     def __len__(self):
-        return len(self.df)
+        return len(self.data)

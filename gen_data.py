@@ -34,11 +34,7 @@ def _gen_captcha(img_dir, num_per_image, n, width, height, choices):
     for _ in range(n):
         for i in itertools.permutations(choices, num_per_image):
             captcha = ''.join(i)
-            if not os.path.exists(os.path.join(img_dir, captcha)):
-                os.makedirs(os.path.join(img_dir, captcha))
-
-            fn = os.path.join(img_dir, captcha,  '%s_%s.png' %
-                              (captcha, uuid.uuid4()))
+            fn = os.path.join(img_dir,  '%s_%s.png' % (captcha, uuid.uuid4()))
             image.write(captcha, fn)
 
 
