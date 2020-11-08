@@ -1,2 +1,4 @@
 captcha==0.3
-torch==1.5.1
+torch==1.7.0
+torchvision==0.8.1
+Pillow==7.2.0
