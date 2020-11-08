@@ -1,12 +1,18 @@
+'''
+This file define models for resolve captcha problem
+'''
+
 import torch
 import torch.nn as nn
-from torchvision import transforms
 
 
 class AlexNet(nn.Module):
+    '''
+    This model is based on Alexnet
+    '''
 
     def __init__(self, num_classes: int = 10, num_digits: int = 4) -> None:
-        super(AlexNet, self).__init__()
+        super().__init__()
         self.num_classes = num_classes
         self.num_digits = num_digits
 
@@ -28,9 +34,13 @@ class AlexNet(nn.Module):
             nn.Linear(1024, num_classes * num_digits),
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.features(x)
-        x = torch.flatten(x, 1)
-        x = self.classifier(x)
-        x = torch.reshape(x, (x.shape[0], self.num_classes, self.num_digits))
-        return x
+    def forward(self, tensor: torch.Tensor) -> torch.Tensor:
+        '''
+        Feed-forward
+        '''
+        tensor = self.features(tensor)
+        tensor = torch.flatten(tensor, 1)
+        tensor = self.classifier(tensor)
+        tensor = torch.reshape(
+            tensor, (tensor.shape[0], self.num_classes, self.num_digits))
+        return tensor

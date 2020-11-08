@@ -1,76 +1,86 @@
+'''
+Utils module
+'''
+
 import os
 import json
-import numpy as np
 from PIL import Image
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms
+from torch.utils.data import Dataset
 import torch
 
 
-def load_data(data_dir, flatten=False, transforms=None):
+def load_data(data_dir, transform=None):
+    '''
+    return train, val, test dataset
+    '''
     train_dir = os.path.join(data_dir, 'train')
     val_dir = os.path.join(data_dir, 'val')
     test_dir = os.path.join(data_dir, 'test')
 
     meta_info = os.path.join(data_dir, 'meta.json')
-    with open(meta_info, 'r') as f:
-        meta = json.load(f)
+    with open(meta_info, 'r') as file:
+        meta = json.load(file)
 
     return (
         meta,
         {
-            'train': CaptchaDataset(train_dir, transforms, **meta),
-            'val': CaptchaDataset(val_dir, transforms, **meta),
-            'test': CaptchaDataset(test_dir, transforms, **meta)
+            'train': CaptchaDataset(train_dir, transform, **meta),
+            'val': CaptchaDataset(val_dir, transform, **meta),
+            'test': CaptchaDataset(test_dir, transform, **meta)
         }
     )
 
 
 class CaptchaDataset(Dataset):
-    """Provide `next_batch` method, which returns the next `batch_size` examples from this data set."""
+    '''
+    Prepare captcha dataset
+    '''
 
-    def __init__(self, dir, transforms, **meta):
+    def __init__(self, folder, transform, **meta):
         self.meta = meta
-        self.data = self._scan_images(dir, **meta)
-        self.transforms = transforms
+        self.width = meta['width']
+        self.height = meta['height']
+        self.label_choices = meta['label_choices']
+        self.data = self._scan_images(folder)
+        self.transform = transform
 
-    def _read_image(self, filename, width, height, **extra_meta):
-        im = Image.open(filename).resize(
-            (width, height), Image.ANTIALIAS)
+    def _read_image(self, filename):
+        img = Image.open(filename).resize(
+            (self.width, self.height), Image.ANTIALIAS)
 
-        return im
+        return img
 
-    def _read_label(self, filename, label_choices, **extra_meta):
+    def _read_label(self, filename):
         basename = os.path.basename(filename)
         labels = basename.split('_')[0]
 
         data = []
 
-        for c in labels:
-            idx = label_choices.index(c)
+        for char in labels:
+            idx = self.label_choices.index(char)
             data.append(idx)
 
         return data
 
-    def _scan_images(self, dir, flatten=False, ext='.png', **meta):
+    def _scan_images(self, folder, ext='.png'):
         data = []
-        for fn in os.listdir(dir):
-            if fn.endswith(ext):
+        for file_name in os.listdir(folder):
+            if file_name.endswith(ext):
                 tmp = {}
-                fd = os.path.join(dir, fn)
-                tmp['image'] = fd
-                tmp['labels'] = self._read_label(fd, **meta)
+                file_path = os.path.join(folder, file_name)
+                tmp['image'] = file_path
+                tmp['labels'] = self._read_label(file_path)
                 data.append(tmp)
         return data
 
     def __getitem__(self, idx):
-        d = self.data[idx]
-        image = self._read_image(d['image'], **self.meta)
+        data = self.data[idx]
+        image = self._read_image(data['image'])
 
-        label = torch.tensor(d['labels'], dtype=torch.long)
+        label = torch.Tensor(data['labels'], dtype=torch.long)
 
-        if self.transforms is not None:
-            image = self.transforms(image)
+        if self.transform is not None:
+            image = self.transform(image)
         return image, label
 
     def __len__(self):

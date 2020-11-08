@@ -1,10 +1,9 @@
-import os
-import time
-import copy
+'''
+Train model
+'''
 
-from PIL import Image
-import numpy as np
-from torchvision import transforms, datasets
+import copy
+from torchvision import transforms
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -13,15 +12,52 @@ from model import AlexNet
 from utils import load_data
 
 
-data_dir = "images/char-4-epoch-6"
-batch_size = 16
+DATA_DIR = "images/char-4-epoch-6"
+BATCH_SIZE = 16
 
 
-def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
-    since = time.time()
+def feed_data(model, phase, dataloaders, criterion, optimizer, device):
+    '''
+    Feed data to model and calculate loss, accuracy
+    '''
 
-    val_acc_history = []
+    running_loss = 0.0
+    running_corrects = 0
 
+    # Iterate over data.
+    for _, batch in enumerate(dataloaders[phase]):
+        inputs, labels = batch
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+
+        # zero the parameter gradients
+        optimizer.zero_grad()
+
+        # forward
+        with torch.set_grad_enabled(phase == 'train'):
+
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+
+            _, preds = torch.max(outputs, 1)
+
+            # backward + optimize only if in training phase
+            if phase == 'train':
+                loss.backward()
+                optimizer.step()
+
+        # statistics
+        running_loss += loss.item() * inputs.size(0)
+        running_corrects += sum([torch.equal(x, y)
+                                 for x, y in zip(preds, labels.data)])
+
+    return running_loss, running_corrects
+
+
+def train_model(model, dataloaders, criterion, optimizer, device, num_epochs=25):
+    '''
+    Train model
+    '''
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
 
@@ -36,35 +72,8 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
             else:
                 model.eval()   # Set model to evaluate mode
 
-            running_loss = 0.0
-            running_corrects = 0
-
-            # Iterate over data.
-            for i, batch in enumerate(dataloaders[phase]):
-                inputs, labels = batch
-                inputs = inputs.to(device)
-                labels = labels.to(device)
-
-                # zero the parameter gradients
-                optimizer.zero_grad()
-
-                # forward
-                with torch.set_grad_enabled(phase == 'train'):
-
-                    outputs = model(inputs)
-                    loss = criterion(outputs, labels)
-
-                    _, preds = torch.max(outputs, 1)
-
-                    # backward + optimize only if in training phase
-                    if phase == 'train':
-                        loss.backward()
-                        optimizer.step()
-
-                # statistics
-                running_loss += loss.item() * inputs.size(0)
-                running_corrects += sum([torch.equal(x, y)
-                                         for x, y in zip(preds, labels.data)])
+            running_loss, running_corrects = feed_data(
+                model, phase, dataloaders, criterion, optimizer, device)
 
             data_len = len(dataloaders[phase].dataset)
             epoch_loss = running_loss / data_len
@@ -77,19 +86,14 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
-            if phase == 'val':
-                val_acc_history.append(epoch_acc)
 
         print()
 
-    time_elapsed = time.time() - since
-    print('Training complete in {:.0f}m {:.0f}s'.format(
-        time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
 
     # load best model weights
     model.load_state_dict(best_model_wts)
-    return model, val_acc_history
+    return model
 
 
 # Create dataloader
@@ -101,24 +105,34 @@ im_transforms = transforms.Compose([
                          std=[0.229, 0.224, 0.225])
 ])
 
-meta, image_datasets = load_data(
-    data_dir, transforms=im_transforms)
 
-dataloaders_dict = {x: torch.utils.data.DataLoader(
-    image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=4) for x in ['train', 'val']}
+def _main():
+    """
+    docstring
+    """
+    _, image_datasets = load_data(
+        DATA_DIR, transform=im_transforms)
 
-# Detect if we have a GPU available
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = AlexNet()
-# Send the model to GPU
-model = model.to(device)
+    dataloaders_dict = {x: torch.utils.data.DataLoader(
+        image_datasets[x], batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
+        for x in ['train', 'val']}
 
-# Observe that all parameters are being optimized
-params_to_update = model.parameters()
-optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
-criterion = nn.CrossEntropyLoss()
+    # Detect if we have a GPU available
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = AlexNet()
+    # Send the model to GPU
+    model = model.to(device)
 
-model, val_acc_history = train_model(
-    model, dataloaders_dict, criterion, optimizer_ft, 30)
+    # Observe that all parameters are being optimized
+    params_to_update = model.parameters()
+    optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
+    criterion = nn.CrossEntropyLoss()
 
-torch.save(model, 'model.pt')
+    model = train_model(
+        model, dataloaders_dict, criterion, optimizer_ft, device, 30)
+
+    torch.save(model, 'model.pt')
+
+
+if __name__ == "__main__":
+    _main()
