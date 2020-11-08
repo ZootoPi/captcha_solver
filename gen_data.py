@@ -1,13 +1,12 @@
-# -*- coding:utf-8 -*-
 import argparse
 import json
+import itertools
 import string
 import os
 import shutil
 import uuid
 from captcha.image import ImageCaptcha
 
-import itertools
 
 FLAGS = None
 META_FILENAME = 'meta.json'
@@ -15,7 +14,7 @@ META_FILENAME = 'meta.json'
 
 def get_choices():
     choices = [
-        (FLAGS.digit, map(str, range(10))),
+        (FLAGS.digit, "0123456789"),
         (FLAGS.lower, string.ascii_lowercase),
         (FLAGS.upper, string.ascii_uppercase),
     ]

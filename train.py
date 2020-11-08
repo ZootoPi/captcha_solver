@@ -40,7 +40,8 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
             running_corrects = 0
 
             # Iterate over data.
-            for inputs, labels in dataloaders[phase]:
+            for i, batch in enumerate(dataloaders[phase]):
+                inputs, labels = batch
                 inputs = inputs.to(device)
                 labels = labels.to(device)
 
@@ -48,7 +49,6 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
                 optimizer.zero_grad()
 
                 # forward
-                # track history if only in train
                 with torch.set_grad_enabled(phase == 'train'):
 
                     outputs = model(inputs)
@@ -63,11 +63,12 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
 
                 # statistics
                 running_loss += loss.item() * inputs.size(0)
-                running_corrects += torch.sum(preds == labels.data)
+                running_corrects += sum([torch.equal(x, y)
+                                         for x, y in zip(preds, labels.data)])
 
-            epoch_loss = running_loss / len(dataloaders[phase].dataset)
-            epoch_acc = running_corrects.double(
-            ) / len(dataloaders[phase].dataset) / 4
+            data_len = len(dataloaders[phase].dataset)
+            epoch_loss = running_loss / data_len
+            epoch_acc = float(running_corrects) / data_len
 
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(
                 phase, epoch_loss, epoch_acc))
@@ -91,6 +92,7 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
     return model, val_acc_history
 
 
+# Create dataloader
 im_transforms = transforms.Compose([
     transforms.Resize((120, 100)),
     transforms.CenterCrop((120, 100)),
@@ -99,32 +101,24 @@ im_transforms = transforms.Compose([
                          std=[0.229, 0.224, 0.225])
 ])
 
-
 meta, image_datasets = load_data(
     data_dir, transforms=im_transforms)
 
-model = AlexNet()
-
-
-# Create training and validation dataloaders
 dataloaders_dict = {x: torch.utils.data.DataLoader(
-    image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=4) for x in ['train', 'val', 'test']}
+    image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=4) for x in ['train', 'val']}
 
 # Detect if we have a GPU available
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+model = AlexNet()
 # Send the model to GPU
 model = model.to(device)
 
-# Gather the parameters to be optimized/updated in this run. If we are
-#  finetuning we will be updating all parameters. However, if we are
-#  doing feature extract method, we will only update the parameters
-#  that we have just initialized, i.e. the parameters with requires_grad
-#  is True.
-params_to_update = model.parameters()
-
 # Observe that all parameters are being optimized
+params_to_update = model.parameters()
 optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
 criterion = nn.CrossEntropyLoss()
 
-train_model(model, dataloaders_dict, criterion, optimizer_ft, 30)
+model, val_acc_history = train_model(
+    model, dataloaders_dict, criterion, optimizer_ft, 30)
+
+torch.save(model, 'model.pt')
