@@ -1,10 +1,10 @@
-import os
+'''
+Train model
+'''
+
 import time
 import copy
-
-from PIL import Image
-import numpy as np
-from torchvision import transforms, datasets
+from torchvision import transforms
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -13,11 +13,14 @@ from model import AlexNet
 from utils import load_data
 
 
-data_dir = "images/char-4-epoch-6"
-batch_size = 16
+DATA_DIR = "images/char-4-epoch-6"
+BATCH_SIZE = 16
 
 
-def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
+def train_model(model, dataloaders, criterion, optimizer, device, num_epochs=25):
+    '''
+    Train model
+    '''
     since = time.time()
 
     val_acc_history = []
@@ -40,7 +43,7 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
             running_corrects = 0
 
             # Iterate over data.
-            for i, batch in enumerate(dataloaders[phase]):
+            for _, batch in enumerate(dataloaders[phase]):
                 inputs, labels = batch
                 inputs = inputs.to(device)
                 labels = labels.to(device)
@@ -101,24 +104,34 @@ im_transforms = transforms.Compose([
                          std=[0.229, 0.224, 0.225])
 ])
 
-meta, image_datasets = load_data(
-    data_dir, transforms=im_transforms)
 
-dataloaders_dict = {x: torch.utils.data.DataLoader(
-    image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=4) for x in ['train', 'val']}
+def _main():
+    """
+    docstring
+    """
+    _, image_datasets = load_data(
+        DATA_DIR, transform=im_transforms)
 
-# Detect if we have a GPU available
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = AlexNet()
-# Send the model to GPU
-model = model.to(device)
+    dataloaders_dict = {x: torch.utils.data.DataLoader(
+        image_datasets[x], batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
+        for x in ['train', 'val']}
 
-# Observe that all parameters are being optimized
-params_to_update = model.parameters()
-optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
-criterion = nn.CrossEntropyLoss()
+    # Detect if we have a GPU available
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = AlexNet()
+    # Send the model to GPU
+    model = model.to(device)
 
-model, val_acc_history = train_model(
-    model, dataloaders_dict, criterion, optimizer_ft, 30)
+    # Observe that all parameters are being optimized
+    params_to_update = model.parameters()
+    optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
+    criterion = nn.CrossEntropyLoss()
 
-torch.save(model, 'model.pt')
+    model, _ = train_model(
+        model, dataloaders_dict, criterion, optimizer_ft, device, 30)
+
+    torch.save(model, 'model.pt')
+
+
+if __name__ == "__main__":
+    _main()
