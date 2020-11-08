@@ -2,7 +2,6 @@
 Train model
 '''
 
-import time
 import copy
 from torchvision import transforms
 import torch
@@ -17,14 +16,48 @@ DATA_DIR = "images/char-4-epoch-6"
 BATCH_SIZE = 16
 
 
+def feed_data(model, phase, dataloaders, criterion, optimizer, device):
+    '''
+    Feed data to model and calculate loss, accuracy
+    '''
+
+    running_loss = 0.0
+    running_corrects = 0
+
+    # Iterate over data.
+    for _, batch in enumerate(dataloaders[phase]):
+        inputs, labels = batch
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+
+        # zero the parameter gradients
+        optimizer.zero_grad()
+
+        # forward
+        with torch.set_grad_enabled(phase == 'train'):
+
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+
+            _, preds = torch.max(outputs, 1)
+
+            # backward + optimize only if in training phase
+            if phase == 'train':
+                loss.backward()
+                optimizer.step()
+
+        # statistics
+        running_loss += loss.item() * inputs.size(0)
+        running_corrects += sum([torch.equal(x, y)
+                                 for x, y in zip(preds, labels.data)])
+
+    return running_loss, running_corrects
+
+
 def train_model(model, dataloaders, criterion, optimizer, device, num_epochs=25):
     '''
     Train model
     '''
-    since = time.time()
-
-    val_acc_history = []
-
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
 
@@ -39,35 +72,8 @@ def train_model(model, dataloaders, criterion, optimizer, device, num_epochs=25)
             else:
                 model.eval()   # Set model to evaluate mode
 
-            running_loss = 0.0
-            running_corrects = 0
-
-            # Iterate over data.
-            for _, batch in enumerate(dataloaders[phase]):
-                inputs, labels = batch
-                inputs = inputs.to(device)
-                labels = labels.to(device)
-
-                # zero the parameter gradients
-                optimizer.zero_grad()
-
-                # forward
-                with torch.set_grad_enabled(phase == 'train'):
-
-                    outputs = model(inputs)
-                    loss = criterion(outputs, labels)
-
-                    _, preds = torch.max(outputs, 1)
-
-                    # backward + optimize only if in training phase
-                    if phase == 'train':
-                        loss.backward()
-                        optimizer.step()
-
-                # statistics
-                running_loss += loss.item() * inputs.size(0)
-                running_corrects += sum([torch.equal(x, y)
-                                         for x, y in zip(preds, labels.data)])
+            running_loss, running_corrects = feed_data(
+                model, phase, dataloaders, criterion, optimizer, device)
 
             data_len = len(dataloaders[phase].dataset)
             epoch_loss = running_loss / data_len
@@ -80,19 +86,14 @@ def train_model(model, dataloaders, criterion, optimizer, device, num_epochs=25)
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
-            if phase == 'val':
-                val_acc_history.append(epoch_acc)
 
         print()
 
-    time_elapsed = time.time() - since
-    print('Training complete in {:.0f}m {:.0f}s'.format(
-        time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
 
     # load best model weights
     model.load_state_dict(best_model_wts)
-    return model, val_acc_history
+    return model
 
 
 # Create dataloader
@@ -127,7 +128,7 @@ def _main():
     optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
     criterion = nn.CrossEntropyLoss()
 
-    model, _ = train_model(
+    model = train_model(
         model, dataloaders_dict, criterion, optimizer_ft, device, 30)
 
     torch.save(model, 'model.pt')
