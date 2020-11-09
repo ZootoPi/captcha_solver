@@ -1,4 +1,4 @@
-"""
+'''
 This module will generate captcha image for train, val and test phase
 Usage: gen_data.py [-h] [-n N] [-t T] [-d] [-l] [-u] [--npi NPI] [--data_dir DATA_DIR]
 
@@ -11,7 +11,7 @@ optional arguments:
   -u, --upper          use uppercase in dataset.
   --npi NPI            number of characters per image.
   --data_dir DATA_DIR  where data will be saved.
-"""
+'''
 
 import argparse
 import json

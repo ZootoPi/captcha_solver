@@ -77,7 +77,7 @@ class CaptchaDataset(Dataset):
         data = self.data[idx]
         image = self._read_image(data['image'])
 
-        label = torch.Tensor(data['labels'], dtype=torch.long)
+        label = torch.tensor(data['labels'], dtype=torch.long)
 
         if self.transform is not None:
             image = self.transform(image)
