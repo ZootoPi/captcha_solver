@@ -87,7 +87,7 @@ def train_model(model, dataloaders, criterion, optimizer, device, num_epochs=25)
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(
                 phase, epoch_loss, epoch_acc))
 
-            # deep copy the model
+            # Deep copy the model
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
@@ -96,7 +96,7 @@ def train_model(model, dataloaders, criterion, optimizer, device, num_epochs=25)
 
     print('Best val Acc: {:4f}'.format(best_acc))
 
-    # load best model weights
+    # Load best model weights
     model.load_state_dict(best_model_wts)
     return model
 
@@ -124,7 +124,7 @@ def create_dataloader(data_dir, batch_size):
 
 def _main(data_dir, batch_size, learning_rate, n_epoch):
     '''
-    main function
+    Main function
     '''
     # Create dataloader
     dataloaders_dict = create_dataloader(data_dir, batch_size)
