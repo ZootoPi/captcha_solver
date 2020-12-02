@@ -63,7 +63,8 @@ def evaluate(model_path, data_dir, batch_size):
             if torch.equal(x, y):
                 running_corrects += 1
             else:
-                print(x, y)
+                # print(x, y)
+                pass
 
     data_len = len(dataloader.dataset)
     print("Test accuracy: ", float(running_corrects) / data_len)
